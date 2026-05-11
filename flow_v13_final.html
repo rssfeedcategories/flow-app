@@ -1240,7 +1240,7 @@ function renderProjectsBody(projs) {
   if(!el) return;
   if(projectsViewMode === 'table') {
     var rows = projs.map(function(p){
-      return '<tr style="cursor:pointer">' +
+      return '<tr onclick="openProject(&quot;'+p.id+'&quot;)" style="cursor:pointer">' +
         '<td><div class="overview-name">'+p.name+'</div>' +
         '<div style="display:flex;gap:6px;flex-wrap:wrap"><span class="'+statusTag(p.status)+'">'+statusLabel(p.status)+'</span>' +
         (healthTagVisible(p) ? ('<span class="'+healthTagClass(p)+'">'+p.health.label+'</span>') : '') +
@@ -1254,6 +1254,10 @@ function renderProjectsBody(projs) {
         '<td><div><span class="tag tag-'+p.updateState+'">'+(p.updateState==='red'?'Past due':p.updateState==='amber'?'Due today':'On cycle')+'</span></div>' +
         '<div class="mini-meta" style="margin-top:6px">'+fmtDate(p.updateDue)+' &middot; every '+p.updateCadenceDays+'d</div>' +
         '<div class="mini-meta">Last update '+fmtDate(p.lastUpdated)+'</div></td>' +
+        '<td onclick="event.stopPropagation()" style="white-space:nowrap">' +
+        '<button onclick="openEditProject(&quot;'+p.id+'&quot;)" style="background:none;border:1px solid var(--border);color:var(--text-sub);border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;font-family:inherit;margin-right:4px">✏️ Edit</button>' +
+        '<button onclick="deleteProject(&quot;'+p.id+'&quot;)" style="background:none;border:1px solid #fecaca;color:var(--red);border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;font-family:inherit">🗑</button>' +
+        '</td>' +
         '</tr>';
     }).join('');
     el.innerHTML = '<table class="overview-table"><thead><tr><th>Project</th><th>Where it\'s up to</th><th>Next step</th><th>Next action date</th><th>Next update due</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>';
