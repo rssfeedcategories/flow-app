@@ -1469,7 +1469,7 @@ function setView(v) {
   if (v==='alltasks') { if(!window.isAdmin)return; currentView='alltasks'; currentProject=null; currentTask=null;
     ['mywork','dashboard','projects','routine','admin','inbox','allactions'].forEach(function(x){var e=document.getElementById('nav-'+x);if(e)e.classList.remove('active');});
     var nat=document.getElementById('nav-alltasks');if(nat)nat.classList.add('active'); renderAllTasks(); return; }
-  if (v==='allactions') { if(!window.isAdmin)return; currentView='allactions'; currentProject=null; currentTask=null;
+  if (v==='allactions') { console.log('setView allactions called, isAdmin='+window.isAdmin); if(!window.isAdmin){console.log('BLOCKED by isAdmin');return;} currentView='allactions'; currentProject=null; currentTask=null;
     ['mywork','dashboard','projects','routine','admin','inbox','alltasks'].forEach(function(x){var e=document.getElementById('nav-'+x);if(e)e.classList.remove('active');});
     var naa=document.getElementById('nav-allactions');if(naa)naa.classList.add('active'); allActionsFilter={project:'',owner:'',status:'',type:'',ws:''}; renderAllActions(null, null, false); return; }
   // Admin panel
@@ -4312,6 +4312,7 @@ function renderMyWork() {
   }
   if (currentWorkDay === 'planweek') { renderPlanWeek(); return; }
   if (currentWorkDay === 'allactions') {
+    console.log('All Actions tab clicked, calling setView');
     setView('allactions');
     return;
   }
@@ -5465,6 +5466,7 @@ function renderAllActions(f, containerId, showBack) {
     if (f.type !== undefined) allActionsFilter.type = f.type;
     if (f.ws !== undefined) allActionsFilter.ws = f.ws;
   }
+  console.log('renderAllActions called, containerId='+containerId);
   document.getElementById('topbar-title').textContent = 'All Actions';
   document.getElementById('topbar-sub').textContent = 'Every action across all projects';
   // Reset main-content style from My Work layout
