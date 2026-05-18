@@ -4312,11 +4312,9 @@ function renderMyWork() {
   }
   if (currentWorkDay === 'planweek') { renderPlanWeek(); return; }
   if (currentWorkDay === 'allactions') {
-    var rp = document.getElementById('mywork-right');
-    if (rp) rp.style.display = 'none';
-    var lp = document.getElementById('mywork-left');
-    if (lp) { lp.style.flex='1'; lp.style.maxWidth='100%'; }
-    allActionsFilter={project:'',owner:'',status:'',type:'',ws:''}; renderAllActions(null, 'mywork-left-content', true);
+    // Navigate to the All Actions view properly
+    currentWorkDay = 'today'; // reset so coming back works
+    setView('allactions');
     return;
   }
   // Restore right panel for other tabs
@@ -4420,7 +4418,8 @@ function renderMyWork() {
   var rightHtml = '';
 
   // Routine
-  rightHtml += '<div style="font-size:10px;font-weight:600;color:var(--text-sub);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Today\'s routine</div>';
+  // Today's Routine hidden for now
+  rightHtml += '';
   if (rt.length) {
     rt.forEach(function(r){
       var done = r.steps.filter(function(s){return s.done;}).length;
@@ -4581,6 +4580,7 @@ function renderPlanWeek() {
     toDiv.innerHTML = toHtml;
     var rightCol = document.getElementById('mywork-right');
     if (rightCol) rightCol.appendChild(toDiv);
+    // Right panel is hidden via CSS
   }
 }
 
