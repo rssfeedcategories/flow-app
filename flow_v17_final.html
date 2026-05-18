@@ -1518,6 +1518,7 @@ function render() {
   };
   document.getElementById('topbar-title').textContent = titles[currentView]||'';
   document.getElementById('topbar-sub').textContent = subs[currentView]||'';
+  if (currentView !== 'mywork') resetMainContent();
   const views = { mywork:renderMyWork, dashboard:renderDashboard, projects:renderProjects, routine:renderRoutine, overview:renderOverview };
   (views[currentView]||renderDashboard)();
 }
@@ -5467,6 +5468,7 @@ function renderAllActions(f, containerId, showBack) {
     if (f.ws !== undefined) allActionsFilter.ws = f.ws;
   }
   console.log('renderAllActions called, containerId='+containerId);
+  if (!containerId) resetMainContent();
   document.getElementById('topbar-title').textContent = 'All Actions';
   document.getElementById('topbar-sub').textContent = 'Every action across all projects';
   // Reset main-content style from My Work layout
@@ -5822,6 +5824,16 @@ function updateMobileBadge() {
 
 // Override render to also update mobile badge
 var _origRenderSidebar = typeof renderSidebar === 'function' ? renderSidebar : null;
+
+
+
+function resetMainContent() {
+  var mc = document.getElementById('main-content');
+  if (!mc) return;
+  mc.removeAttribute('style');
+  mc.style.overflowY = 'auto';
+  mc.style.padding = '24px';
+}
 
 
 
