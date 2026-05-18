@@ -1471,7 +1471,7 @@ function setView(v) {
     var nat=document.getElementById('nav-alltasks');if(nat)nat.classList.add('active'); renderAllTasks(); return; }
   if (v==='allactions') { if(!window.isAdmin)return; currentView='allactions'; currentProject=null; currentTask=null;
     ['mywork','dashboard','projects','routine','admin','inbox','alltasks'].forEach(function(x){var e=document.getElementById('nav-'+x);if(e)e.classList.remove('active');});
-    var naa=document.getElementById('nav-allactions');if(naa)naa.classList.add('active'); renderAllActions(); return; }
+    var naa=document.getElementById('nav-allactions');if(naa)naa.classList.add('active'); renderAllActions(null, null, false); return; }
   // Admin panel
   if (v==='admin') {
     if (!window.isAdmin) return;
@@ -4312,17 +4312,11 @@ function renderMyWork() {
   }
   if (currentWorkDay === 'planweek') { renderPlanWeek(); return; }
   if (currentWorkDay === 'allactions') {
-    // Hide right panel for full-width all actions view
     var rp = document.getElementById('mywork-right');
     if (rp) rp.style.display = 'none';
     var lp = document.getElementById('mywork-left');
     if (lp) { lp.style.flex='1'; lp.style.maxWidth='100%'; }
-    // Render back button + all actions into the left content area
-    var cont = document.getElementById('mywork-left-content');
-    if (cont) {
-      cont.innerHTML = '<div style="padding:12px 0 16px"><button onclick="setWorkDay(&quot;today&quot;)" style="background:none;border:1px solid var(--border);color:var(--text-sub);border-radius:7px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit">&larr; My Work</button></div>';
-    }
-    renderAllActions(null, 'mywork-left-content');
+    renderAllActions(null, 'mywork-left-content', true);
     return;
   }
   // Restore right panel for other tabs
@@ -5262,7 +5256,8 @@ function renderOverview(f) {
   var deptOpts = depts.map(function(d){return '<option value="'+d.id+'"'+(overviewFilter.dept===d.id?' selected':'')+'>'+d.name+'</option>';}).join('');
   var ownerOpts = users.map(function(u){return '<option value="'+u+'"'+(overviewFilter.owner===u?' selected':'')+'>'+u+'</option>';}).join('');
 
-  var filterBar = '<div class="card" style="margin-bottom:16px;padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+  var backBtnHtml = showBack ? '<div style="padding:8px 0 4px"><button onclick="setWorkDay(&quot;today&quot;)" style="background:none;border:1px solid var(--border);color:var(--text-sub);border-radius:7px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit">&larr; My Work</button></div>' : '';
+  var filterBar = backBtnHtml + '<div class="card" style="margin-bottom:16px;padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
     '<select class="form-select" style="width:auto;font-size:12px" onchange="renderOverview({dept:this.value})"><option value="">All Departments</option>' + deptOpts + '</select>' +
     '<select class="form-select" style="width:auto;font-size:12px" onchange="renderOverview({status:this.value})"><option value="">All Statuses</option>' +
     '<option value="active"'+(overviewFilter.status==='active'?' selected':'')+'>On Track</option>' +
@@ -5464,7 +5459,7 @@ function renderAllTasks(f) {
 // ── ALL ACTIONS VIEW (admin) ──────────────────────────────────────────────────
 var allActionsFilter = { project:'', owner:'', status:'', type:'', ws:'' };
 
-function renderAllActions(f, containerId) {
+function renderAllActions(f, containerId, showBack) {
   if (f) {
     if (f.project !== undefined) allActionsFilter.project = f.project;
     if (f.owner !== undefined) allActionsFilter.owner = f.owner;
