@@ -5398,6 +5398,8 @@ function renderAllTasks(f) {
   }
   document.getElementById('topbar-title').textContent = 'All Tasks';
   document.getElementById('topbar-sub').textContent = 'Every task across all projects';
+  var mc2 = document.getElementById('main-content');
+  if (mc2) { mc2.style.padding = ''; mc2.style.overflow = ''; }
   var allProjects = window.isAdmin ? (data.projects||[]) : activeProjects();
   var users = signedInUsers().map(function(u){ return u.name||u.email; });
   var tasks = [];
@@ -5465,6 +5467,9 @@ function renderAllActions(f, containerId, showBack) {
   }
   document.getElementById('topbar-title').textContent = 'All Actions';
   document.getElementById('topbar-sub').textContent = 'Every action across all projects';
+  // Reset main-content style from My Work layout
+  var mc = document.getElementById('main-content');
+  if (mc) { mc.style.padding = ''; mc.style.overflow = ''; }
   var allProjects = window.isAdmin ? (data.projects||[]) : activeProjects();
   var users = signedInUsers().map(function(u){ return u.name||u.email; });
   var actionTypes = ['Call','Meeting','Research','Blocked Time','Follow Up','Other'];
