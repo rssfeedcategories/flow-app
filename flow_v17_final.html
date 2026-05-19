@@ -4273,6 +4273,16 @@ function taskOnlyAssignedItems() {
 }
 
 function renderMyWork() {
+  // All Actions tab: render shell + allactions content, return early
+  if (currentWorkDay === 'allactions') {
+    allActionsFilter={project:'',owner:'',status:'',type:'',ws:''};
+    renderMyWorkShell();
+    renderAllActions(null, 'mywork-left-content', true);
+    return;
+  }
+  // Plan Week tab: handled separately
+  if (currentWorkDay === 'planweek') { renderPlanWeek(); return; }
+
   var todayStr = new Date().toISOString().split('T')[0];
   var rt = activeRoutines().filter(routineRunsToday);
   var wi = waitingItems();
