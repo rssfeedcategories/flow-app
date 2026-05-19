@@ -5266,7 +5266,7 @@ function renderOverview(f) {
   var deptOpts = depts.map(function(d){return '<option value="'+d.id+'"'+(overviewFilter.dept===d.id?' selected':'')+'>'+d.name+'</option>';}).join('');
   var ownerOpts = users.map(function(u){return '<option value="'+u+'"'+(overviewFilter.owner===u?' selected':'')+'>'+u+'</option>';}).join('');
 
-  var backBtnHtml = showBack ? '<div style="padding:8px 0 4px"><button onclick="setWorkDay(&quot;today&quot;)" style="background:none;border:1px solid var(--border);color:var(--text-sub);border-radius:7px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit">&larr; My Work</button></div>' : '';
+  var backBtnHtml = '<div style="padding:0 0 12px"><button onclick="setView(\'mywork\')" style="background:none;border:1px solid var(--border);color:var(--text-sub);border-radius:7px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit">&larr; My Work</button></div>';
   var filterBar = backBtnHtml + '<div class="card" style="margin-bottom:16px;padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
     '<select class="form-select" style="width:auto;font-size:12px" onchange="renderOverview({dept:this.value})"><option value="">All Departments</option>' + deptOpts + '</select>' +
     '<select class="form-select" style="width:auto;font-size:12px" onchange="renderOverview({status:this.value})"><option value="">All Statuses</option>' +
