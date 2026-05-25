@@ -825,10 +825,10 @@ async function saveData() {
 // Debounced save — don't hammer Firestore on every render
 let saveTimer = null;
 window.scheduleSave = function() {
-  clearTimeout(saveTimer);
+  // Save immediately — no debounce to prevent data loss
   window._localSave = true;
   window._localSaveTime = Date.now();
-  saveTimer = setTimeout(saveData, 800);
+  saveData();
 };
 
 // Start listening to shared Firestore doc
@@ -839,8 +839,8 @@ function startSync() {
       const d = snap.data();
       // Only update if change came from someone else (avoid echo loops)
       // Add 2s grace period after local save to prevent overwrite
-      const justSaved = window._localSaveTime && (Date.now() - window._localSaveTime) < 5000;
-      const myOwnSave = d._savedBy === currentUser.email && window._localSave;
+      const justSaved = window._localSaveTime && (Date.now() - window._localSaveTime) < 10000;
+      const myOwnSave = d._savedBy === currentUser.email;
       if (!myOwnSave && !justSaved) {
         Object.assign(data, d);
         ensureProjectDefaults();
