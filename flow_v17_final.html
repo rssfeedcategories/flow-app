@@ -3210,17 +3210,41 @@ function getVisibleTo() {
   return Array.from(boxes).map(function(b){return b.value;});
 }
 
+function injectDropdown(wrapId, selectId, defaultVal) {
+  var wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  var users = signedInUsers();
+  var opts = users.map(function(u){ var n=u.name||u.email; return '<option value="'+n+'"'+(n===defaultVal?' selected':'')+'>'+n+'</option>'; }).join('');
+  wrap.innerHTML = '<select class="form-select" id="'+selectId+'">'+opts+'</select>';
+}
+
 function openAddProject() {
+  var typeOpts = ['Call','Meeting','Research','Blocked Time','Follow Up','Other'].map(function(t){
+    return '<option value="'+t+'">'+t+'</option>';
+  }).join('');
+
   openModal('New Project', `
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:12px">Project Details</div>
     <div class="form-group">
-      <label class="form-label">Project Name</label>
+      <label class="form-label">Project Name *</label>
       <input class="form-input" id="proj-name" placeholder="What is this project?">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Department *</label>
+      <select class="form-select" id="proj-dept">
+        <option value="">-- Select department --</option>
+        ${(data.departments||[]).map(d=>`<option value="${d.id}">${d.name}</option>`).join('')}
+      </select>
     </div>
     <div class="form-group">
       <label class="form-label">Workspace</label>
       <select class="form-select" id="proj-ws">
         ${data.workspaces.map(w=>`<option value="${w.id}" ${data.activeWorkspace===w.id?'selected':''}>${w.name}</option>`).join('')}
       </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Owner</label>
+      <div id="proj-owner-wrap"></div>
     </div>
     <div class="form-group">
       <label class="form-label">Status</label>
@@ -3230,42 +3254,6 @@ function openAddProject() {
         <button class="status-pill" onclick="selectStatus(this,'draft')">📐 Draft</button>
       </div>
       <input type="hidden" id="proj-status" value="active">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Owner</label>
-      <div id="proj-owner-wrap"></div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Where it's up to (optional)</label>
-      <textarea class="form-textarea" id="proj-where" placeholder="Brief summary of current situation..."></textarea>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Next Step</label>
-      <input class="form-input" id="proj-next" placeholder="What's the immediate next move?">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Department (optional)</label>
-      <select class="form-select" id="proj-dept">
-        <option value="">No department</option>
-        ${(data.departments||[]).map(d=>`<option value="${d.id}">${d.name}</option>`).join('')}
-      </select>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Assignees <span style="font-size:11px;color:var(--text-dim);font-weight:400">— full project access</span></label>
-      <div id="proj-assignees-wrap"></div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Followers <span style="font-size:11px;color:var(--text-dim);font-weight:400">— can view &amp; update</span></label>
-      <div id="proj-followers-wrap"></div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Required Update Every</label>
-      <select class="form-select" id="proj-cadence">
-        <option value="3">Every 3 days</option>
-        <option value="7" selected>Every 7 days</option>
-        <option value="14">Every 14 days</option>
-        <option value="30">Every 30 days</option>
-      </select>
     </div>
     <div class="form-group">
       <label class="form-label">Quarter</label>
@@ -3279,28 +3267,128 @@ function openAddProject() {
         <option value="Q3-2027">Q3 2027</option><option value="Q4-2027">Q4 2027</option>
       </select>
     </div>
+    <div class="form-group">
+      <label class="form-label">Required Update Every</label>
+      <select class="form-select" id="proj-cadence">
+        <option value="3">Every 3 days</option>
+        <option value="7" selected>Every 7 days</option>
+        <option value="14">Every 14 days</option>
+        <option value="30">Every 30 days</option>
+      </select>
+    </div>
+
+    <div style="border-top:2px solid var(--border);margin:18px 0 14px;padding-top:14px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:12px">First Task *</div>
+      <div class="form-group">
+        <label class="form-label">Task Title *</label>
+        <input class="form-input" id="task1-title" placeholder="What needs to be done?">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Task Owner</label>
+        <div id="task1-owner-wrap"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Due Date</label>
+        <input type="date" class="form-input" id="task1-due">
+      </div>
+    </div>
+
+    <div style="border-top:2px solid var(--border);margin:18px 0 14px;padding-top:14px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-sub);margin-bottom:12px">First Action <span style="font-weight:400;font-size:10px">(optional — leave blank to add later)</span></div>
+      <div class="form-group">
+        <label class="form-label">Action Title</label>
+        <input class="form-input" id="act1-title" placeholder="Specific next action...">
+      </div>
+      <div style="display:flex;gap:10px">
+        <div class="form-group" style="flex:1">
+          <label class="form-label">Type</label>
+          <select class="form-select" id="act1-type">${typeOpts}</select>
+        </div>
+        <div class="form-group" style="flex:1">
+          <label class="form-label">Est. (min)</label>
+          <input type="number" class="form-input" id="act1-est" value="30" min="5" step="5">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label class="form-label">Scheduled</label>
+          <input type="date" class="form-input" id="act1-date">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Action Owner</label>
+        <div id="act1-owner-wrap"></div>
+      </div>
+    </div>
   `, ()=>{
     const name = document.getElementById('proj-name').value.trim();
     if (!name) { alert('Please enter a project name'); return; }
-    var dv=document.getElementById('proj-dept');if(!dv||!dv.value){alert('Please select a department');if(dv)dv.focus();return;}
-    const proj = {
-      id: 'p'+Date.now(), ws: document.getElementById('proj-ws').value,
-      name, status: document.getElementById('proj-status').value,
-      department: document.getElementById('proj-dept') ? document.getElementById('proj-dept').value : '',
-      quarter: document.getElementById('proj-quarter') ? document.getElementById('proj-quarter').value : '',
-      assignees: getMultiSelect('proj-assignees'),
-      followers: getMultiSelect('proj-followers'),
-      whereItsAt: document.getElementById('proj-where').value || 'Just started.',
-      nextStep: document.getElementById('proj-next').value || 'Define first action item.',
-      owner: (document.getElementById('proj-owner') ? document.getElementById('proj-owner').value : currentUserName()) || currentUserName(),
-      updateCadenceDays: Number(document.getElementById('proj-cadence').value || 7),
-      lastUpdated: today(), captures: [], tasks: []
+    var dv=document.getElementById('proj-dept');
+    if (!dv||!dv.value) { alert('Please select a department'); if(dv)dv.focus(); return; }
+    const taskTitle = document.getElementById('task1-title').value.trim();
+    if (!taskTitle) { alert('Please enter a first task title'); document.getElementById('task1-title').focus(); return; }
+
+    const taskOwner = (document.getElementById('task1-owner')||{}).value || currentUserName();
+    const taskDue = document.getElementById('task1-due').value;
+
+    const actTitle = document.getElementById('act1-title').value.trim();
+    const actType = document.getElementById('act1-type').value;
+    const actEst = Number(document.getElementById('act1-est').value)||30;
+    const actDate = document.getElementById('act1-date').value;
+    const actOwner = (document.getElementById('act1-owner')||{}).value || taskOwner;
+
+    // Build action (if title entered)
+    var actions = [];
+    if (actTitle) {
+      actions.push({ id:'a'+Date.now(), title:actTitle, type:actType, est:actEst, scheduled:actDate, owner:actOwner, status:'pending', createdAt:new Date().toISOString(), createdBy:currentUserName(), captures:[] });
+    }
+
+    // Build task with action
+    var task = {
+      id: 't'+Date.now(),
+      title: taskTitle,
+      status: 'in-progress',
+      owner: taskOwner,
+      due: taskDue,
+      actions: actions,
+      updates: [], captures: [],
+      createdAt: new Date().toISOString(),
+      createdBy: currentUserName(),
+      missingAction: !actTitle  // flag if no action entered
     };
+
+    const projOwner = (document.getElementById('proj-owner')||{}).value || currentUserName();
+    const proj = {
+      id: 'p'+Date.now(),
+      name,
+      ws: document.getElementById('proj-ws').value,
+      status: document.getElementById('proj-status').value,
+      department: dv.value,
+      quarter: document.getElementById('proj-quarter').value,
+      owner: projOwner,
+      updateCadenceDays: Number(document.getElementById('proj-cadence').value||7),
+      lastUpdated: today(),
+      whereItsAt: 'Just started.',
+      nextStep: taskTitle,
+      captures: [],
+      tasks: [task],
+      updates: []
+    };
+
     logChange('Project created', proj.name);
     data.projects.push(proj);
     window._localSave=true; if(window.scheduleSave)window.scheduleSave();
-    closeModal(); notify('Project created'); render();
+    closeModal();
+    notify('Project created' + (!actTitle ? ' — add a first action to the task' : ''));
+    render();
+    // Open the project so user can see it
+    setTimeout(function(){ openProject(proj.id); }, 300);
   }, 'Create Project');
+
+  // Inject owner dropdowns after modal renders
+  setTimeout(function(){
+    injectDropdown('proj-owner-wrap', 'proj-owner', currentUserName());
+    injectDropdown('task1-owner-wrap', 'task1-owner', currentUserName());
+    injectDropdown('act1-owner-wrap', 'act1-owner', currentUserName());
+  }, 50);
 }
 
 function selectStatus(btn, val) {
