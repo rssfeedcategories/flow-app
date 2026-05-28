@@ -809,23 +809,95 @@ const defaultData = {
 
 // Save to Firestore (shared doc for whole team)
 async function saveData() {
-  if (!currentUser) return;
-  if (window._demoMode) return; // demo mode uses localStorage
+  if (!currentUser) { console.warn('saveData: no currentUser'); return; }
+  if (window._demoMode) return;
   try {
+    const saveTime = new Date().toISOString();
+
+    // Read latest Firestore state and merge before saving
+    // This prevents overwriting changes made by other users
+    try {
+      const latest = await getDoc(doc(db, 'flow', 'shared'));
+      if (latest.exists()) {
+        const remote = latest.data();
+        const remoteTime = remote._lastSaved || '';
+        const localTime = data._lastSaved || '';
+        // If remote is newer than our last known save, merge projects/updates
+        if (remoteTime > localTime) {
+          // Merge: keep our in-memory changes but pull in any updates/tasks
+          // from other users that we don't have
+          if (remote.projects) {
+            remote.projects.forEach(function(rp) {
+              var lp = data.projects.find(function(p){ return p.id === rp.id; });
+              if (lp) {
+                // Merge updates — keep all unique update IDs
+                var localUpdIds = (lp.updates||[]).map(function(u){return u.id;});
+                (rp.updates||[]).forEach(function(ru){
+                  if (localUpdIds.indexOf(ru.id) < 0) {
+                    if (!lp.updates) lp.updates = [];
+                    lp.updates.push(ru);
+                  }
+                });
+                // Merge tasks
+                var localTaskIds = (lp.tasks||[]).map(function(t){return t.id;});
+                (rp.tasks||[]).forEach(function(rt){
+                  if (localTaskIds.indexOf(rt.id) < 0) {
+                    if (!lp.tasks) lp.tasks = [];
+                    lp.tasks.push(rt);
+                  } else {
+                    // Merge actions within existing tasks
+                    var lt = lp.tasks.find(function(t){return t.id===rt.id;});
+                    if (lt) {
+                      var localActIds = (lt.actions||[]).map(function(a){return a.id;});
+                      (rt.actions||[]).forEach(function(ra){
+                        if (localActIds.indexOf(ra.id) < 0) {
+                          if (!lt.actions) lt.actions = [];
+                          lt.actions.push(ra);
+                        }
+                      });
+                    }
+                  }
+                });
+              }
+            });
+          }
+        }
+      }
+    } catch(mergeErr) {
+      console.warn('Merge read failed, saving anyway:', mergeErr.message);
+    }
+
+    data._lastSaved = saveTime;
+    data._savedBy = currentUser.email;
     await setDoc(doc(db, 'flow', 'shared'), {
       ...data,
-      _lastSaved: new Date().toISOString(),
+      _lastSaved: saveTime,
       _savedBy: currentUser.email
     });
+    console.log('✅ Saved at', saveTime, 'by', currentUser.email);
   } catch(e) {
     console.error('Save error:', e);
+    // Show visible error so user knows save failed
+    var msg = e.code === 'permission-denied'
+      ? 'Save failed: Permission denied. Ask your admin to update Firestore security rules.'
+      : 'Save failed: ' + (e.message||e.code||'Unknown error');
+    notify(msg);
+    // Try to show a persistent banner
+    var existing = document.getElementById('save-error-banner');
+    if (!existing) {
+      var banner = document.createElement('div');
+      banner.id = 'save-error-banner';
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#dc2626;color:white;text-align:center;padding:8px;font-size:13px;font-weight:600;z-index:9999;cursor:pointer';
+      banner.textContent = '⚠ Changes not saving — ' + (e.code||e.message||'check console') + ' (click to dismiss)';
+      banner.onclick = function(){ this.remove(); };
+      document.body.prepend(banner);
+    }
   }
 }
 
 // Debounced save — don't hammer Firestore on every render
 let saveTimer = null;
 window.scheduleSave = function() {
-  // Save immediately — no debounce to prevent data loss
   window._localSave = true;
   window._localSaveTime = Date.now();
   saveData();
@@ -837,16 +909,20 @@ function startSync() {
   unsubscribeSnapshot = onSnapshot(doc(db, 'flow', 'shared'), (snap) => {
     if (snap.exists()) {
       const d = snap.data();
-      // Only update if change came from someone else (avoid echo loops)
-      // Add 2s grace period after local save to prevent overwrite
+      // Only apply snapshot if:
+      // 1. It came from someone else AND
+      // 2. We haven't saved locally in the last 10 seconds
       const justSaved = window._localSaveTime && (Date.now() - window._localSaveTime) < 10000;
-      const myOwnSave = d._savedBy === currentUser.email;
-      if (!myOwnSave && !justSaved) {
-        Object.assign(data, d);
-        ensureProjectDefaults();
-        try { render(); updateNotifBadge(); } catch(e) {}
+      if (!justSaved) {
+        // Safe to apply - merge carefully: only update if incoming is newer
+        var incomingTime = d._lastSaved || '';
+        var localTime = data._lastSaved || '';
+        if (incomingTime >= localTime) {
+          Object.assign(data, d);
+          ensureProjectDefaults();
+          try { render(); updateNotifBadge(); } catch(e) {}
+        }
       }
-      window._localSave = false;
     }
   });
 }
