@@ -904,24 +904,91 @@ window.scheduleSave = function() {
 };
 
 // Start listening to shared Firestore doc
+function mergeRemoteData(remote) {
+  // Smart merge: never lose local data, only add/update from remote
+  // Non-project fields: always take remote (settings, users, departments etc)
+  var fields = ['workspaces','departments','_users','_auditLog','_notifications','inbox','routines','workSort'];
+  fields.forEach(function(f){ if (remote[f] !== undefined) data[f] = remote[f]; });
+
+  // Projects: merge carefully so no updates/tasks are lost
+  var remoteProjects = remote.projects || [];
+  var localProjects = data.projects || [];
+
+  remoteProjects.forEach(function(rp) {
+    var lp = localProjects.find(function(p){ return p.id === rp.id; });
+    if (!lp) {
+      // New project from remote — add it
+      localProjects.push(rp);
+    } else {
+      // Existing project — merge fields but preserve local updates/tasks
+      // Take remote scalar fields (name, status, owner, etc)
+      var preserve = ['id','updates','tasks','captures'];
+      Object.keys(rp).forEach(function(k){
+        if (preserve.indexOf(k) < 0) lp[k] = rp[k];
+      });
+
+      // Merge updates — keep all, add any new ones from remote
+      var localUpdIds = (lp.updates||[]).map(function(u){return u.id;});
+      (rp.updates||[]).forEach(function(ru){
+        if (localUpdIds.indexOf(ru.id) < 0) {
+          if (!lp.updates) lp.updates = [];
+          lp.updates.push(ru);
+        } else {
+          // Update existing update record with remote version (in case it was edited)
+          var li = lp.updates.findIndex(function(u){return u.id===ru.id;});
+          if (li >= 0) lp.updates[li] = ru;
+        }
+      });
+
+      // Merge tasks
+      var localTaskIds = (lp.tasks||[]).map(function(t){return t.id;});
+      (rp.tasks||[]).forEach(function(rt){
+        if (localTaskIds.indexOf(rt.id) < 0) {
+          if (!lp.tasks) lp.tasks = [];
+          lp.tasks.push(rt);
+        } else {
+          var lt = lp.tasks.find(function(t){return t.id===rt.id;});
+          if (lt) {
+            // Merge task scalar fields
+            var tPreserve = ['id','actions','updates','captures'];
+            Object.keys(rt).forEach(function(k){
+              if (tPreserve.indexOf(k) < 0) lt[k] = rt[k];
+            });
+            // Merge actions
+            var localActIds = (lt.actions||[]).map(function(a){return a.id;});
+            (rt.actions||[]).forEach(function(ra){
+              if (localActIds.indexOf(ra.id) < 0) {
+                if (!lt.actions) lt.actions = [];
+                lt.actions.push(ra);
+              } else {
+                var ai = lt.actions.findIndex(function(a){return a.id===ra.id;});
+                if (ai >= 0) lt.actions[ai] = ra;
+              }
+            });
+          }
+        }
+      });
+    }
+  });
+
+  // Handle deleted projects (project in local but not in remote — keep local for now)
+  // We don't delete projects from local unless explicitly done by user
+
+  data.projects = localProjects;
+  data._lastSaved = remote._lastSaved || data._lastSaved;
+  data._savedBy = remote._savedBy || data._savedBy;
+}
+
 function startSync() {
   if (unsubscribeSnapshot) unsubscribeSnapshot();
   unsubscribeSnapshot = onSnapshot(doc(db, 'flow', 'shared'), (snap) => {
     if (snap.exists()) {
       const d = snap.data();
-      // Only apply snapshot if:
-      // 1. It came from someone else AND
-      // 2. We haven't saved locally in the last 10 seconds
-      const justSaved = window._localSaveTime && (Date.now() - window._localSaveTime) < 10000;
+      const justSaved = window._localSaveTime && (Date.now() - window._localSaveTime) < 5000;
       if (!justSaved) {
-        // Safe to apply - merge carefully: only update if incoming is newer
-        var incomingTime = d._lastSaved || '';
-        var localTime = data._lastSaved || '';
-        if (incomingTime >= localTime) {
-          Object.assign(data, d);
-          ensureProjectDefaults();
-          try { render(); updateNotifBadge(); } catch(e) {}
-        }
+        mergeRemoteData(d);
+        ensureProjectDefaults();
+        try { render(); updateNotifBadge(); } catch(e) {}
       }
     }
   });
@@ -1033,19 +1100,37 @@ function visibleProjects() {
 // Record user in _users map when they sign in
 async function recordUser(user) {
   const key = emailKey(user.email);
+  try {
+    // Always read latest Firestore data first before updating user record
+    const snap = await getDoc(doc(db, 'flow', 'shared'));
+    if (snap.exists()) {
+      const remote = snap.data();
+      // Merge remote into data without losing anything
+      mergeRemoteData(remote);
+    }
+  } catch(e) {
+    console.warn('recordUser: could not pre-read Firestore', e.message);
+  }
+
   const users = data._users || {};
-  // Migrate legacy isAdmin boolean → role field
   const existingRole = users[key]?.role || (users[key]?.isAdmin ? 'admin' : 'member');
+  const existingDepts = users[key]?.departments || [];
   users[key] = {
     email: user.email,
     name: user.displayName || user.email,
     lastSeen: new Date().toISOString(),
     role: existingRole,
+    departments: existingDepts,
     uid: user.uid
   };
   data._users = users;
   bootstrapAdminIfNeeded(key);
-  await setDoc(doc(db, 'flow', 'shared'), { ...data, _lastSaved: new Date().toISOString(), _savedBy: user.email });
+  // Now safe to save — data is up to date
+  const saveTime = new Date().toISOString();
+  data._lastSaved = saveTime;
+  data._savedBy = user.email;
+  window._localSaveTime = Date.now();
+  await setDoc(doc(db, 'flow', 'shared'), { ...data, _lastSaved: saveTime, _savedBy: user.email });
 }
 
 // Auth flow
