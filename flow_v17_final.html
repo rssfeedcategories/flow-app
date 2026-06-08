@@ -808,6 +808,15 @@ const defaultData = {
 };
 
 // Save to Firestore (shared doc for whole team)
+// Remove undefined values and non-serializable types before Firestore save
+function sanitizeForFirestore(obj) {
+  return JSON.parse(JSON.stringify(obj, function(key, val) {
+    if (val === undefined) return null;
+    if (typeof val === 'function') return undefined; // removes functions
+    return val;
+  }));
+}
+
 async function saveData() {
   if (!currentUser) { console.warn('saveData: no currentUser'); return; }
   if (window._demoMode) return;
@@ -869,11 +878,12 @@ async function saveData() {
 
     data._lastSaved = saveTime;
     data._savedBy = currentUser.email;
-    await setDoc(doc(db, 'flow', 'shared'), {
+    const cleanData = sanitizeForFirestore({
       ...data,
       _lastSaved: saveTime,
       _savedBy: currentUser.email
     });
+    await setDoc(doc(db, 'flow', 'shared'), cleanData);
     console.log('✅ Saved at', saveTime, 'by', currentUser.email);
   } catch(e) {
     console.error('Save error:', e);
@@ -1130,7 +1140,7 @@ async function recordUser(user) {
   data._lastSaved = saveTime;
   data._savedBy = user.email;
   window._localSaveTime = Date.now();
-  await setDoc(doc(db, 'flow', 'shared'), { ...data, _lastSaved: saveTime, _savedBy: user.email });
+  await setDoc(doc(db, 'flow', 'shared'), sanitizeForFirestore({ ...data, _lastSaved: saveTime, _savedBy: user.email }));
 }
 
 // Auth flow
@@ -2875,7 +2885,7 @@ function completeAction(projId, taskId, actionId) {
     // Save immediately
     window._localSave = true;
     if (window._setDoc && window._db && window._doc && window.currentUser) {
-      var payload2 = Object.assign({}, data, { _lastSaved: new Date().toISOString(), _savedBy: window.currentUser.email });
+      var payload2 = sanitizeForFirestore(Object.assign({}, data, { _lastSaved: new Date().toISOString(), _savedBy: window.currentUser.email }));
       window._localSave = true; window._localSaveTime = Date.now();
       window._setDoc(window._doc(window._db, 'flow', 'shared'), payload2).catch(function(e){ console.error('Save error:', e); });
     } else if (window.scheduleSave) { window.scheduleSave(); }
@@ -2911,7 +2921,7 @@ function completeTask(projId, taskId) {
     t.completedBy = completedBy;
     window._localSave = true;
     if (window._setDoc && window._db && window._doc && window.currentUser) {
-      var payload3 = Object.assign({}, data, { _lastSaved: new Date().toISOString(), _savedBy: window.currentUser.email });
+      var payload3 = sanitizeForFirestore(Object.assign({}, data, { _lastSaved: new Date().toISOString(), _savedBy: window.currentUser.email }));
       window._localSave = true; window._localSaveTime = Date.now();
       window._setDoc(window._doc(window._db, 'flow', 'shared'), payload3).catch(function(e){ console.error('Save error:', e); });
     } else if (window.scheduleSave) { window.scheduleSave(); }
@@ -3824,7 +3834,7 @@ function openUpdateForm(projId, editId) {
     // Save immediately and directly — bypass debounce to prevent snapshot overwrite
     window._localSave = true;
     if (window._setDoc && window._db && window._doc && window.currentUser) {
-      var payload = Object.assign({}, data, { _lastSaved: new Date().toISOString(), _savedBy: window.currentUser.email });
+      var payload = sanitizeForFirestore(Object.assign({}, data, { _lastSaved: new Date().toISOString(), _savedBy: window.currentUser.email }));
       window._localSave = true; window._localSaveTime = Date.now();
       window._setDoc(window._doc(window._db, 'flow', 'shared'), payload)
         .then(function(){ closeModal(); notify(isEdit?"Update saved":"Update added"); if (currentProject) renderProjectDetail(); else render(); })
